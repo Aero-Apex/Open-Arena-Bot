@@ -1,0 +1,36 @@
+{
+  "name": "open-arena-bot",
+  "version": "2.0.0",
+  "description": "The Ultimate Multi-AI Discord Mega-Bot with NVIDIA Nemotron, SearXNG, and Davinci.ai integration",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "ai",
+    "nvidia",
+    "nemotron",
+    "davinci",
+    "searxng"
+  ],
+  "author": "OpenArena Team",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.1",
+    "axios": "^1.6.7",
+    "playwright": "^1.42.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Aero-Apex/Open-Arena-Bot.git"
+  }
+}

@@ -3,7 +3,9 @@
 // Manages cooldowns, chat history, and caches
 // ============================================
 
+import { EmbedBuilder } from 'discord.js';
 import CONFIG from '../config/index.js';
+import log from '../utils/logger.js';
 
 const cooldowns = new Map();
 const chatHistory = new Map();
@@ -108,27 +110,70 @@ export function stopAllStatusIntervals() {
 }
 
 /**
- * Get or create status interval
+ * Start status update interval for channel
  */
-export function setStatusInterval(channelId, interval) {
-    if (activeStatusIntervals.has(channelId)) {
-        clearInterval(activeStatusIntervals.get(channelId).interval);
+export function startStatusInterval(client, channel) {
+    if (activeStatusIntervals.has(channel.id)) {
+        clearInterval(activeStatusIntervals.get(channel.id).interval);
     }
-    activeStatusIntervals.set(channelId, { interval });
+    
+    const updateStatus = async () => {
+        try {
+            const embed = new EmbedBuilder()
+                .setColor(CONFIG.colors.primary)
+                .setTitle('🤖 Bot Status Update')
+                .addFields(
+                    { name: '⚡ Latency', value: `${Math.round(client.ws.ping)}ms`, inline: true },
+                    { name: '📡 Uptime', value: formatUptime(client.uptime), inline: true },
+                    { name: '👥 Servers', value: `${client.guilds.cache.size}`, inline: true }
+                )
+                .setFooter({ text: `Logged in as ${client.user.tag}` })
+                .setTimestamp();
+            
+            await channel.send({ embeds: [embed] }).catch(() => {});
+        } catch (err) {
+            log.error('Status update failed:', err);
+            stopStatusInterval(channel.id);
+        }
+    };
+    
+    // Send initial status
+    updateStatus();
+    
+    // Set interval for updates every 30 seconds
+    const interval = setInterval(updateStatus, 30000);
+    activeStatusIntervals.set(channel.id, { interval });
+    
+    return interval;
 }
 
 /**
- * Delete status interval
+ * Stop status update interval for channel
  */
-export function deleteStatusInterval(channelId) {
-    activeStatusIntervals.delete(channelId);
+export function stopStatusInterval(channelId) {
+    const data = activeStatusIntervals.get(channelId);
+    if (data && data.interval) {
+        clearInterval(data.interval);
+        activeStatusIntervals.delete(channelId);
+    }
 }
 
 /**
- * Get status interval
+ * Format uptime into readable string
  */
-export function getStatusInterval(channelId) {
-    return activeStatusIntervals.get(channelId);
+function formatUptime(ms) {
+    const seconds = Math.floor((ms / 1000) % 60);
+    const minutes = Math.floor((ms / (1000 * 60)) % 60);
+    const hours = Math.floor((ms / (1000 * 60 * 60)) % 24);
+    const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
+    
+    return parts.join(' ');
 }
 
 /**
@@ -161,20 +206,3 @@ export function getCachedWebhook(channelId) {
 export function setCachedWebhook(channelId, webhook) {
     webhookCache.set(channelId, webhook);
 }
-
-export default {
-    checkCooldown,
-    getCooldownSeconds,
-    getHistory,
-    addToHistory,
-    clearHistory,
-    startCleanupInterval,
-    stopAllStatusIntervals,
-    setStatusInterval,
-    deleteStatusInterval,
-    getStatusInterval,
-    getCachedRating,
-    setCachedRating,
-    getCachedWebhook,
-    setCachedWebhook
-};

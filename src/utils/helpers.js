@@ -167,12 +167,15 @@ export function keepTyping(channel) {
     };
 }
 
-export default {
-    splitIntoChunks,
-    isValidImageUrl,
-    safeResolveColor,
-    parseMentions,
-    extractMentions,
-    cleanAndParseJSON,
-    keepTyping
-};
+/**
+ * Format time duration into readable string
+ */
+export function formatTime(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
+}

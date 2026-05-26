@@ -7,10 +7,13 @@ if (!process.env.DISCORD_TOKEN) {
 }
 
 const CONFIG = {
-    bot: {
+    // ✅ FIXED: Grouped credentials under 'discord' to match src/index.js
+    discord: {
         token: process.env.DISCORD_TOKEN,
         clientId: process.env.CLIENT_ID,
         guildId: process.env.GUILD_ID,
+    },
+    bot: {
         systemPrompt: "You are OpenArena, an advanced AI assistant powered by NVIDIA Nemotron. You provide detailed, context-aware, and helpful responses."
     },
     embed: {

@@ -6,18 +6,14 @@ import {
     AttachmentBuilder 
 } from 'discord.js';
 
-// ✅ FIX 1: Corrected import for automateDavinci
+// Services & Utils
 import { automateDavinci } from '../services/davinciService.js';
-
-// ✅ FIX 2: Corrected import for CONFIG (default export)
-import CONFIG from '../config/index.js';
-
-// ✅ FIX 3: Corrected import for log (default export - removed curly braces)
-import log from '../utils/logger.js';
-
-// Wire up actual services found in your repo
 import { askLLM, searchSearXNG } from '../services/nvidiaService.js';
 import { clearHistory, startStatusInterval } from './stateManager.js';
+
+// Config & Logger (Using Default Exports)
+import CONFIG from '../config/index.js';
+import log from '../utils/logger.js';
 
 /**
  * Handle /generate command
@@ -48,7 +44,7 @@ export async function handleGenerate(interaction) {
         const successEmbed = new EmbedBuilder()
             .setColor(CONFIG.embed.DEFAULT_COLOR)
             .setTitle('✨ Image Generated Successfully!')
-            .setImage(`attachment://${fileName}`) // Use attachment:// protocol
+            .setImage(`attachment://${fileName}`)
             .addFields(
                 { name: '📝 Prompt', value: prompt.slice(0, 1024), inline: false },
                 { name: '🎨 Model', value: model, inline: true },
@@ -68,7 +64,7 @@ export async function handleGenerate(interaction) {
         await interaction.editReply({
             embeds: [successEmbed],
             components: [row],
-            files: [attachment] // Pass the buffer here
+            files: [attachment]
         });
     } catch (err) {
         log.error('Generate command error:', err);
@@ -203,6 +199,5 @@ export async function handleStatus(interaction) {
  * Handle /message command (Admin)
  */
 export async function handleMessage(interaction) {
-    // Admin webhook embed logic
     await interaction.reply({ content: '✅ Webhook embed sent.', ephemeral: true });
 }

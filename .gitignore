@@ -1,33 +1,37 @@
 ```
-# Environment variables
-.env
-.env.local
-.env.*
-
 # Dependencies
 node_modules/
+
+# Environment variables
+.env.local
+.env
+
+# Build artifacts
+*.js.map
+*.mjs.map
+*.d.ts
+*.d.mts
+*.d.cts
 
 # Logs
 *.log
 
-# Temporary files
-*.tmp
-*.swp
-
-# Editor/IDE files
-.vscode/
-.idea/
-
-# Python cache (if applicable)
-__pycache__/
-*.pyc
-
-# Build outputs (if applicable)
-dist/
-build/
-target/
-
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# Package lock
+package-lock.json
+
+# Playwright
+playwright-core/
+
+# IDE
+.vscode/
+.idea/
 ```

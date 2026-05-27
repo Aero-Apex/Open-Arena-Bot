@@ -118,28 +118,26 @@ async function setupTurnstileBypass() {
 
 async function tryClickTurnstileWidget() {
     try {
-        // Try to find and click the Turnstile checkbox iframe
         const frame = await page.$('iframe[src*="turnstile"]');
         if (frame) {
             log.info("[EaseMate] Found Turnstile iframe, trying to click...");
             const box = await frame.boundingBox();
             if (box) {
                 await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-                await page.waitForTimeout(2000);
+                await page.waitForTimeout(1500);
                 return true;
             }
         }
 
-        // Try the placeholder div approach
         const widget = await page.$('[class*="turnstile"], [class*="cf-turnstile"], #cf-turnstile');
         if (widget) {
-            log.info("[EaseMate] Found Turnstile widget, trying to click...");
-            await widget.click();
-            await page.waitForTimeout(2000);
+            log.info("[EaseMate] Found Turnstile widget, trying force-click...");
+            await widget.click({ force: true, timeout: 3000 });
+            await page.waitForTimeout(1500);
             return true;
         }
     } catch (e) {
-        log.warn("[EaseMate] Turnstile widget click failed:", e.message);
+        log.warn("[EaseMate] Turnstile widget click failed (non-visible, mock will handle):", e.message);
     }
     return false;
 }
@@ -231,7 +229,12 @@ async function navigateToChat() {
 
 async function isLoggedIn() {
     return page.evaluate(() => {
-        return document.querySelector('span:has-text("Log In")') === null;
+        const spans = document.querySelectorAll("span");
+        for (const s of spans) {
+            if (s.textContent?.trim() === "Log In") return false;
+        }
+        // Also check if we see chat elements
+        return document.querySelector("textarea, div[contenteditable='true'], div[role='textbox']") !== null;
     }).catch(() => false);
 }
 
@@ -277,64 +280,78 @@ async function signup() {
     }
 
     // Try to interact with real Turnstile widget, fallback to mock
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
     await tryClickTurnstileWidget();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(1000);
 
     updateProgress("Creating account...");
     await safeClick("button:has-text('Create Account')", 10000);
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(4000);
 
-    // Verify we're on the verification page (look for digit inputs)
-    const onVerifyPage = await page.evaluate(() => {
-        return document.querySelector('input[aria-label*="Digit"], input[placeholder*="code"], input[placeholder*="Code"]') !== null;
-    }).catch(() => false);
+    // Detect which page we landed on after signup attempt
+    const pageState = await page.evaluate(() => {
+        const digitInputs = document.querySelectorAll('input[aria-label*="Digit"], input[placeholder*="code"], input[placeholder*="Code"]');
+        if (digitInputs.length > 0) return "verify";
 
-    if (!onVerifyPage) {
-        // Take debug screenshot
+        const chatInputs = document.querySelectorAll("textarea, div[contenteditable='true'], div[role='textbox']");
+        if (chatInputs.length > 0) return "chat";
+
+        const spans = document.querySelectorAll("span");
+        for (const s of spans) {
+            if (s.textContent?.trim() === "Log In") return "login";
+        }
+
+        return "unknown";
+    }).catch(() => "unknown");
+
+    log.info(`[EaseMate] Post-signup page state: ${pageState}`);
+
+    if (pageState === "verify") {
+        updateProgress("Waiting for verification email...");
+        const code = await getLatestEmailCode(mailToken);
+        updateProgress("Entering verification code...");
+
+        for (let i = 0; i < 6 && i < code.length; i++) {
+            try {
+                const input = await page.waitForSelector(`input[aria-label='Digit ${i + 1}']`, { timeout: 3000 });
+                await input.fill(code[i]);
+            } catch {
+                const inputs = await page.$$("input[type='text']");
+                if (inputs.length > i && inputs[i]) {
+                    await inputs[i].fill(code[i]);
+                }
+            }
+            await page.waitForTimeout(150);
+        }
+
+        if (code.length <= 6) {
+            await page.keyboard.press("Enter");
+        }
+
+        await page.waitForTimeout(3000);
+
+        updateProgress("Setting up GPT-5.5...");
+        await navigateToChat();
+        await page.waitForTimeout(3000);
+    } else if (pageState === "chat") {
+        updateProgress("Account created without verification!");
+    } else if (pageState === "login") {
+        // Account creation failed, try to detect error
+        const pageText = await page.evaluate(() => document.body?.innerText?.trim() || "").catch(() => "");
+        const errorText = pageText.split("\n").filter(l => l.length > 3).slice(0, 5).join(" ").slice(0, 500);
+        throw new Error(`Account creation failed. Page shows: ${errorText}`);
+    } else {
+        // Unknown state — screenshot and continue optimistically
         try {
             await page.screenshot({ path: `easemate_debug_${Date.now()}.png`, fullPage: true });
             log.info("[EaseMate] Debug screenshot saved");
         } catch {}
-
-        // Check for visible errors
-        const pageError = await page.evaluate(() => {
-            const errEl = document.querySelector('[class*="error"], [class*="alert"], [class*="message"], [role="alert"]');
-            return errEl ? errEl.textContent?.trim() : "unknown error (screenshot saved)";
-        }).catch(() => "unknown error");
-
-        throw new Error(`Signup may have failed: ${pageError}`);
+        updateProgress("Continuing after signup...");
+        await navigateToChat();
+        await page.waitForTimeout(3000);
     }
 
-    updateProgress("Waiting for verification email...");
-    const code = await getLatestEmailCode(mailToken);
-    updateProgress("Entering verification code...");
-
-    for (let i = 0; i < 6 && i < code.length; i++) {
-        try {
-            const input = await page.waitForSelector(`input[aria-label='Digit ${i + 1}']`, { timeout: 3000 });
-            await input.fill(code[i]);
-        } catch {
-            const inputs = await page.$$("input[type='text']");
-            if (inputs.length > i && inputs[i]) {
-                await inputs[i].fill(code[i]);
-            }
-        }
-        await page.waitForTimeout(150);
-    }
-
-    if (code.length <= 6) {
-        // Press tab/enter to confirm
-        await page.keyboard.press("Enter");
-    }
-
-    await page.waitForTimeout(3000);
-
-    updateProgress("Setting up GPT-5.5...");
-    await navigateToChat();
-    await page.waitForTimeout(3000);
     await selectGpt55();
-
     saveCookies();
     updateProgress("Account ready!");
 }

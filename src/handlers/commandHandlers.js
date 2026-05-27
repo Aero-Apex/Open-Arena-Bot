@@ -8,6 +8,7 @@ import {
 
 import { automateDavinci } from '../services/davinciService.js';
 import { askLLM, searchSearXNG } from '../services/nvidiaService.js';
+import { askEaseMate } from '../services/easemateService.js';
 import { clearHistory, startStatusInterval } from './stateManager.js';
 
 import CONFIG from '../config/index.js';
@@ -75,7 +76,24 @@ export async function handleGenerate(interaction) {
 export async function handleAsk(interaction) {
     await interaction.deferReply();
     const prompt = interaction.options.getString('prompt');
+    const model = interaction.options.getString('model') || 'nvidia';
     const webSearch = interaction.options.getBoolean('web_search') || false;
+
+    if (model === 'easemate') {
+        const noSolver = !CONFIG.anticaptcha.apiKey && !CONFIG.anticaptcha.capsolverKey;
+        if (noSolver) {
+            return interaction.editReply("❌ EaseMate requires `ANTICAPTCHA_API_KEY` or `CAPSOLVER_API_KEY` in `.env`");
+        }
+
+        try {
+            const response = await askEaseMate(prompt);
+            await interaction.editReply(response.slice(0, 2000));
+        } catch (err) {
+            log.error('EaseMate ask error:', err);
+            await interaction.editReply(`❌ EaseMate GPT-5.5 failed: ${err.message}`);
+        }
+        return;
+    }
 
     try {
         let context = "";

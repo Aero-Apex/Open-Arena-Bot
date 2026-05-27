@@ -5,6 +5,28 @@ All notable changes to the OpenArena Discord Bot project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2024-XX-XX
+
+### 🚀 New Feature: EaseMate GPT-5.5 Integration
+- **`/ask` now accepts a `model` option**: Users can choose between `NVIDIA Nemotron` (default) and `EaseMate GPT-5.5`.
+- **`src/services/easemateService.js`**: Full browser automation service for [EaseMate.ai](https://www.easemate.ai). Handles account signup via mail.tm, Cloudflare Turnstile bypass (Anti-Captcha or Capsolver), GPT-5.5 model selection, prompt submission, and response extraction.
+- **Session persistence**: Cookies saved to `./sessions/easemate_cookies.json`. Single account reused across commands; auto-re-signup if session expires.
+- **Singleton browser**: Shared Playwright instance across all `/ask` calls, closed gracefully on bot shutdown.
+- **Dual solver support**: `ANTICAPTCHA_API_KEY` (via `@antiadmin/anticaptchaofficial`) or `CAPSOLVER_API_KEY` (via HTTP API). Feature disabled with a clear error if neither is set.
+
+### 📦 Dependencies
+- Added `@antiadmin/anticaptchaofficial` for Turnstile solving.
+
+### 🔧 Maintenance
+- Updated `src/index.js` shutdown handler to also close EaseMate browser.
+- Updated `.gitignore` to exclude `sessions/` directory.
+
+### 📚 Documentation
+- README updated with EaseMate feature description, env var table, and architecture diagram.
+- CHANGELOG updated for v2.1.0.
+
+---
+
 ## [2.0.1] - 2024-XX-XX
 
 ### 🐛 Fixed

@@ -28,6 +28,7 @@ import {
     stopAllStatusIntervals
 } from './handlers/stateManager.js';
 import { askLLM, searchSearXNG } from './services/nvidiaService.js';
+import { easemateClose } from './services/easemateService.js';
 import { splitIntoChunks, keepTyping } from './utils/helpers.js';
 
 const commandHandlers = {
@@ -197,19 +198,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 });
 
-process.on("SIGINT", () => {
-    log.info("Shutting down...");
+async function shutdown(signal) {
+    log.info(`Shutting down (${signal})...`);
     stopAllStatusIntervals();
+    await easemateClose();
     client.destroy();
     process.exit(0);
-});
+}
 
-process.on("SIGTERM", () => {
-    log.info("Shutting down (SIGTERM)...");
-    stopAllStatusIntervals();
-    client.destroy();
-    process.exit(0);
-});
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 client.login(CONFIG.discord.token);
 

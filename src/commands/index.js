@@ -12,8 +12,13 @@ export const commands = [
     
     new SlashCommandBuilder()
         .setName("ask")
-        .setDescription("Ask the AI (NVIDIA Nemotron)")
+        .setDescription("Ask the AI")
         .addStringOption(o => o.setName("prompt").setDescription("Your question / prompt").setRequired(true))
+        .addStringOption(o => o.setName("model").setDescription("AI model").setRequired(false)
+            .addChoices(
+                { name: 'NVIDIA Nemotron', value: 'nvidia' },
+                { name: 'EaseMate GPT-5.5', value: 'easemate' }
+            ))
         .addBooleanOption(o => o.setName("web_search").setDescription("Enable web search?").setRequired(false)),
     
     new SlashCommandBuilder()

@@ -1,7 +1,7 @@
 {
   "name": "open-arena-bot",
-  "version": "2.0.1",
-  "description": "The Ultimate Multi-AI Discord Mega-Bot with NVIDIA Nemotron, SearXNG, and Davinci.ai integration",
+  "version": "2.1.0",
+  "description": "The Ultimate Multi-AI Discord Mega-Bot with NVIDIA Nemotron, SearXNG, Davinci.ai, and EaseMate GPT-5.5 integration",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -21,9 +21,10 @@
   "author": "OpenArena Team",
   "license": "MIT",
   "dependencies": {
+    "@antiadmin/anticaptchaofficial": "^1.0.55",
+    "axios": "^1.6.7",
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.1",
-    "axios": "^1.6.7",
     "playwright": "^1.42.0"
   },
   "engines": {

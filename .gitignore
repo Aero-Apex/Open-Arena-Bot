@@ -30,6 +30,9 @@ package-lock.json
 # Playwright
 playwright-core/
 
+# Sessions (cookies, etc)
+sessions/
+
 # IDE
 .vscode/
 .idea/

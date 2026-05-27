@@ -17,7 +17,7 @@ Powered by **NVIDIA Nemotron · SearXNG · Davinci.ai**
 
 | Command | Description |
 |---|---|
-| `/ask` | Ask NVIDIA Nemotron or EaseMate GPT-5.5, with optional web search |
+| `/ask` | Ask NVIDIA Nemotron with optional web search |
 | `/generate` | Generate AI images via Davinci.ai browser automation |
 | `/rate` | Research & rate any AI model (0–100) using live web data |
 | `/battle` | Pit two AI models head-to-head with web-sourced analysis |
@@ -25,8 +25,6 @@ Powered by **NVIDIA Nemotron · SearXNG · Davinci.ai**
 | `/clear` | Wipe the bot's short-term memory per channel |
 | `/ping` | Check bot latency |
 | `/message` | Send admin-only formatted embeds |
-
-> **New**: `/ask` now supports a `model` option — choose `NVIDIA Nemotron` (default) or `EaseMate GPT-5.5`.
 
 ## 📋 Prerequisites
 
@@ -64,11 +62,6 @@ cp .env.example .env
 | `NVIDIA_API_KEY` | ✅ Yes | — | NVIDIA Nemotron API key |
 | `NVIDIA_BASE_URL` | ❌ No | `https://integrate.api.nvidia.com/v1` | Custom API endpoint |
 | `NVIDIA_MODEL` | ❌ No | `nvidia/llama-3.1-nemotron-70b-instruct` | Override model |
-| `ANTICAPTCHA_API_KEY` | ❌ No | — | Anti-Captcha key for EaseMate Turnstile (optional) |
-| `CAPSOLVER_API_KEY` | ❌ No | — | Capsolver key for EaseMate Turnstile (optional) |
-| `EASEMATE_SESSION_DIR` | ❌ No | `./sessions` | Cookie persistence directory |
-
-> EaseMate GPT-5.5 works without any captcha solver key. The bot uses a Turnstile mock bypass by default. If the site enforces strict captcha validation, set `ANTICAPTCHA_API_KEY` or `CAPSOLVER_API_KEY`.
 | `SEARXNG_URL` | ❌ No | `http://192.168.88.32:8080/search` | SearXNG instance |
 | `STATUS_URL` | ❌ No | `https://openarena.eu.cc/` | Status monitor target |
 | `DEBUG` | ❌ No | `false` | Enable debug logging |
@@ -94,8 +87,7 @@ src/
 │   └── stateManager.js         # Cooldowns, caches, chat history
 ├── services/
 │   ├── nvidiaService.js        # NVIDIA Nemotron LLM + SearXNG search
-│   ├── davinciService.js       # Davinci.ai browser automation
-│   └── easemateService.js      # EaseMate.ai GPT-5.5 browser automation
+│   └── davinciService.js       # Davinci.ai browser automation
 └── utils/
     ├── logger.js               # Structured logging
     └── helpers.js              # Text splitting, JSON parsing, typing
@@ -135,10 +127,7 @@ Discord ──► Gateway Intents
                                              Service  │  Service
                                                  │    │    │
                                               SearXNG │  Playwright
-                                                      │
-                                                easemateService
-                                                   (GPT-5.5)
-```
+ ```
 
 ## 🤝 Contributing
 

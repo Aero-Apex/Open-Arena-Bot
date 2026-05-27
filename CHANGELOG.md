@@ -5,6 +5,26 @@ All notable changes to the OpenArena Discord Bot project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-05-27
+
+### 🗑️ Removed
+- **EaseMate GPT-5.5 integration**: Removed entire EaseMate service (`src/services/easemateService.js`), browser automation, Turnstile bypass, mail.tm signup, session/cookie management.
+- **`/ask` model selector**: Removed the `model` option from `/ask`. The command now always uses NVIDIA Nemotron with optional web search.
+- **Config entries**: Removed `anticaptcha` and `easemate` sections from config.
+- **Shutdown dependency**: Removed `easemateClose()` call from the shutdown handler.
+
+### 🔧 Maintenance
+- All command UIs overhauled with step-based progress embeds (✅ completed / ⏳ current / ⬜ pending indicators) — covers `/ask`, `/generate`, `/rate`, `/battle`, `/ping`, `/clear`, `/status`, `/message`.
+
+### 🐛 Fixed
+- **Modal overlay blocking interactions**: Aggressive `dismissModals()` added that removes ant-modal elements, presses Escape 5×, clicks all close buttons with `force: true`.
+- **2-use cookie expiry**: Sessions now auto-delete after 2 uses to prevent stale cookies.
+- **GPT-5.5 selector**: Fixed exact text matching to avoid `GPT-5.5 Free` being selected instead of `GPT-5.5`.
+- **Response extraction**: Broadened CSS selectors for EaseMate chat response detection.
+- **Send button**: Added `{ force: true }` to send clicks.
+
+---
+
 ## [2.1.0] - 2024-XX-XX
 
 ### 🚀 New Feature: EaseMate GPT-5.5 Integration

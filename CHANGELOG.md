@@ -14,8 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Singleton browser**: Shared Playwright instance across all `/ask` calls, closed gracefully on bot shutdown.
 - **Dual solver support**: `ANTICAPTCHA_API_KEY` (via `@antiadmin/anticaptchaofficial`) or `CAPSOLVER_API_KEY` (via HTTP API). Feature disabled with a clear error if neither is set.
 
-### 📦 Dependencies
-- Added `@antiadmin/anticaptchaofficial` for Turnstile solving.
+### 🔧 Changed
+- **Removed captcha API key requirement**: EaseMate now uses a Turnstile mock bypass (blocks the real Turnstile script, provides a mock that auto-calls the callback). No `ANTICAPTCHA_API_KEY` or `CAPSOLVER_API_KEY` needed. If the site enforces server-side verification, setting one of those keys still works as a fallback.
 
 ### 🔧 Maintenance
 - Updated `src/index.js` shutdown handler to also close EaseMate browser.

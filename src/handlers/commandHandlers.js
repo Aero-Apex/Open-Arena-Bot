@@ -80,11 +80,6 @@ export async function handleAsk(interaction) {
     const webSearch = interaction.options.getBoolean('web_search') || false;
 
     if (model === 'easemate') {
-        const noSolver = !CONFIG.anticaptcha.apiKey && !CONFIG.anticaptcha.capsolverKey;
-        if (noSolver) {
-            return interaction.editReply("❌ EaseMate requires `ANTICAPTCHA_API_KEY` or `CAPSOLVER_API_KEY` in `.env`");
-        }
-
         try {
             const response = await askEaseMate(prompt);
             await interaction.editReply(response.slice(0, 2000));

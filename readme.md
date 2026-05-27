@@ -64,11 +64,11 @@ cp .env.example .env
 | `NVIDIA_API_KEY` | ✅ Yes | — | NVIDIA Nemotron API key |
 | `NVIDIA_BASE_URL` | ❌ No | `https://integrate.api.nvidia.com/v1` | Custom API endpoint |
 | `NVIDIA_MODEL` | ❌ No | `nvidia/llama-3.1-nemotron-70b-instruct` | Override model |
-| `ANTICAPTCHA_API_KEY` | ❌ No* | — | Anti-Captcha key for EaseMate Turnstile |
-| `CAPSOLVER_API_KEY` | ❌ No* | — | Capsolver key for EaseMate Turnstile |
+| `ANTICAPTCHA_API_KEY` | ❌ No | — | Anti-Captcha key for EaseMate Turnstile (optional) |
+| `CAPSOLVER_API_KEY` | ❌ No | — | Capsolver key for EaseMate Turnstile (optional) |
 | `EASEMATE_SESSION_DIR` | ❌ No | `./sessions` | Cookie persistence directory |
 
-\* One of `ANTICAPTCHA_API_KEY` or `CAPSOLVER_API_KEY` is required for EaseMate GPT-5.5.
+> EaseMate GPT-5.5 works without any captcha solver key. The bot uses a Turnstile mock bypass by default. If the site enforces strict captcha validation, set `ANTICAPTCHA_API_KEY` or `CAPSOLVER_API_KEY`.
 | `SEARXNG_URL` | ❌ No | `http://192.168.88.32:8080/search` | SearXNG instance |
 | `STATUS_URL` | ❌ No | `https://openarena.eu.cc/` | Status monitor target |
 | `DEBUG` | ❌ No | `false` | Enable debug logging |

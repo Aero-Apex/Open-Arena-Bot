@@ -6,7 +6,7 @@ import path from "path";
 import CONFIG from "../config/index.js";
 import log from "../utils/logger.js";
 
-// ─── mail.tm helpers (shared pattern with davinciService) ───────────────
+// ─── mail.tm helpers ────────────────────────────────────────────────────
 
 const MAILTM_BASE = "https://api.mail.tm";
 
@@ -63,106 +63,40 @@ async function getLatestEmailCode(token) {
     throw new Error("Verification email never arrived.");
 }
 
-// ─── Turnstile solver ──────────────────────────────────────────────────
+// ─── Turnstile bypass (no API key needed) ──────────────────────────────
 
-async function solveTurnstileAntiCaptcha(page) {
-    const ac = await import("@antiadmin/anticaptchaofficial");
-    ac.default.setAPIKey(CONFIG.anticaptcha.apiKey);
-    ac.default.setSoftId(0);
+const MOCK_TURNSTILE_JS = `
+window.turnstile = {
+    render: function(container, params) {
+        if (params && params.callback) {
+            setTimeout(function() { params.callback('MOCK_TOKEN_0000'); }, 50);
+        }
+        return 'mock-widget';
+    },
+    execute: function(container, params) {
+        if (params && params.callback) {
+            setTimeout(function() { params.callback('MOCK_TOKEN_0000'); }, 50);
+        }
+    },
+    getResponse: function() { return 'MOCK_TOKEN_0000'; },
+    reset: function() {},
+    remove: function() {},
+    ready: function(fn) { if (fn) setTimeout(fn, 10); }
+};
+`;
 
-    const params = await interceptTurnstile(page);
-    log.info(`[EaseMate] Turnstile params extracted: sitekey=${params.websiteKey}`);
-
-    const token = await ac.default.solveTurnstileProxyless(
-        params.websiteURL,
-        params.websiteKey,
-        params.action,
-        params.cData,
-        params.chlPageData
-    );
-
-    await page.evaluate((t) => { window.cfCallback(t); }, token);
-    log.info("[EaseMate] Turnstile solved via Anti-Captcha");
-}
-
-async function solveTurnstileCapsolver(page) {
-    const CAPSOLVER_API = "https://api.capsolver.com";
-    const clientKey = CONFIG.anticaptcha.capsolverKey;
-
-    const params = await interceptTurnstile(page);
-    log.info(`[EaseMate] Turnstile params extracted: sitekey=${params.websiteKey}`);
-
-    const taskResp = await axios.post(`${CAPSOLVER_API}/createTask`, {
-        clientKey,
-        task: {
-            type: "AntiTurnstileTaskProxyLess",
-            websiteURL: params.websiteURL,
-            websiteKey: params.websiteKey,
-        },
+async function setupTurnstileMock() {
+    await page.route("**/challenges.cloudflare.com/**", (route) => {
+        route.fulfill({
+            status: 200,
+            contentType: "application/javascript",
+            body: MOCK_TURNSTILE_JS,
+        });
     });
 
-    const taskId = taskResp.data.taskId;
-    if (!taskId) throw new Error(`Capsolver createTask failed: ${JSON.stringify(taskResp.data)}`);
+    await context.addInitScript(MOCK_TURNSTILE_JS);
 
-    let token = null;
-    for (let i = 0; i < 30; i++) {
-        await sleep(2000);
-        const resultResp = await axios.post(`${CAPSOLVER_API}/getTaskResult`, { clientKey, taskId });
-        if (resultResp.data.status === "ready") {
-            token = resultResp.data.solution?.token;
-            break;
-        }
-    }
-
-    if (!token) throw new Error("Capsolver timed out solving Turnstile");
-
-    await page.evaluate((t) => { window.cfCallback(t); }, token);
-    log.info("[EaseMate] Turnstile solved via Capsolver");
-}
-
-async function interceptTurnstile(page) {
-    let params = null;
-    const maxRetries = 5;
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        await page.goto(CONFIG.easemate.url, { waitUntil: "domcontentloaded", timeout: 45000 });
-
-        await page.evaluate(() => {
-            window.turnstile = new Proxy(window.turnstile, {
-                get(target, prop) {
-                    if (prop === "render") {
-                        return function (a, b) {
-                            const p = {
-                                websiteURL: window.location.href,
-                                websiteKey: b.sitekey,
-                                action: b.action,
-                                cData: b.cData,
-                                chlPageData: b.chlPageData,
-                                userAgent: navigator.userAgent,
-                            };
-                            window.params = p;
-                            window.cfCallback = b.callback;
-                            return target.render.apply(this, arguments);
-                        };
-                    }
-                    return target[prop];
-                },
-            });
-        });
-
-        params = await page.evaluate(() => {
-            return new Promise((resolve) => {
-                setTimeout(() => resolve(window.params || null), 5000);
-            });
-        });
-
-        if (params) break;
-        log.info(`[EaseMate] Retrying Turnstile interception (${attempt + 1}/${maxRetries})...`);
-        await sleep(3000);
-    }
-
-    if (!params) throw new Error("Failed to intercept Turnstile after retries");
-    return params;
+    log.info("[EaseMate] Turnstile mock installed");
 }
 
 // ─── Browser & session management ──────────────────────────────────────
@@ -238,15 +172,11 @@ async function initBrowser() {
 
     page = await context.newPage();
 
-    let pageCrashed = false;
-    page.on("crash", () => { pageCrashed = true; });
-    page.on("close", () => { pageCrashed = true; });
+    page.on("crash", () => {});
+    page.on("close", () => {});
 
-    page.on("response", (response) => {
-        if (response.url().includes("turnstile") && response.status() === 200) {
-            log.debug("[EaseMate] Turnstile response intercepted");
-        }
-    });
+    // Install Turnstile bypass for every new page
+    await setupTurnstileMock();
 
     log.info("[EaseMate] Browser launched");
 }
@@ -257,8 +187,7 @@ async function navigateToChat() {
 
 function isLoggedIn() {
     return page.evaluate(() => {
-        const loginBtn = document.querySelector('span:has-text("Log In")');
-        return !loginBtn;
+        return document.querySelector('span:has-text("Log In")') === null;
     }).catch(() => false);
 }
 
@@ -274,26 +203,16 @@ async function signup() {
     const sitePassword = generatePassword(8);
     const mailToken = await getMailtmToken(account.email, account.password);
 
-    // Navigate & intercept Turnstile
-    const solver = CONFIG.anticaptcha.apiKey
-        ? solveTurnstileAntiCaptcha
-        : CONFIG.anticaptcha.capsolverKey
-            ? solveTurnstileCapsolver
-            : null;
-
-    if (!solver) {
-        throw new Error("No captcha solver configured (ANTICAPTCHA_API_KEY or CAPSOLVER_API_KEY required)");
-    }
-
-    await solver(page);
+    await navigateToChat();
+    await page.waitForTimeout(3000);
 
     // Click through signup modal
     try {
-        await safeClick("span:has-text('Log In')", 5000);
+        await safeClick("span:has-text('Log In')", 8000);
         await page.waitForTimeout(2000);
-        await safeClick("span:has-text('Continue with Email')", 5000);
+        await safeClick("span:has-text('Continue with Email')", 8000);
         await page.waitForTimeout(2000);
-        await safeClick("a:has-text('Sign up now')", 5000);
+        await safeClick("a:has-text('Sign up now')", 8000);
         await page.waitForTimeout(2000);
     } catch (e) {
         log.warn("[EaseMate] Modal navigation issue, state may vary:", e.message);
@@ -307,8 +226,11 @@ async function signup() {
         throw new Error(`Could not fill signup form: ${e.message}`);
     }
 
+    // Short wait for Turnstile mock to fire callback
+    await page.waitForTimeout(2000);
+
     // Click create account
-    await safeClick("button:has-text('Create Account')", 5000);
+    await safeClick("button:has-text('Create Account')", 8000);
     log.info("[EaseMate] Account created, waiting for verification email...");
 
     // Verification code
@@ -320,7 +242,6 @@ async function signup() {
             const input = await page.waitForSelector(`input[aria-label='Digit ${i + 1}']`, { timeout: 5000 });
             await input.fill(code[i]);
         } catch {
-            // Try generic input fields
             const inputs = await page.$$("input[type='text']");
             if (inputs.length >= 6 && inputs[i]) {
                 await inputs[i].fill(code[i]);
@@ -358,14 +279,12 @@ async function safeFill(selector, value) {
 
 async function selectGpt55() {
     try {
-        // Hover/click the model selector showing "Gemini 2.0 Flash"
         const modelTrigger = await page.waitForSelector("span:has-text('Gemini 2.0 Flash')", { timeout: 10000 });
         await modelTrigger.hover();
         await page.waitForTimeout(1000);
         await modelTrigger.click();
         await page.waitForTimeout(1500);
 
-        // Select GPT-5.5 from dropdown
         const gpt55 = await page.waitForSelector("span:has-text('GPT-5.5')", { timeout: 5000 });
         await gpt55.click();
         await page.waitForTimeout(1500);
@@ -379,7 +298,6 @@ async function selectGpt55() {
 // ─── Ask flow ──────────────────────────────────────────────────────────
 
 async function sendPrompt(text) {
-    // Try finding the chat input — common selectors
     const selectors = [
         "textarea",
         "div[contenteditable='true']",
@@ -396,7 +314,6 @@ async function sendPrompt(text) {
     }
 
     if (!input) {
-        // Fallback: find any large input field
         const allInputs = await page.$$("input, textarea, div[contenteditable]");
         for (const el of allInputs) {
             const box = await el.boundingBox();
@@ -426,7 +343,6 @@ async function sendPrompt(text) {
 
     await page.waitForTimeout(500);
 
-    // Try clicking send button
     const sendSelectors = [
         "button[type='submit']",
         "svg[aria-label='Send']",
@@ -445,7 +361,6 @@ async function sendPrompt(text) {
         }
     }
 
-    // If no send button found, press Enter
     if (!sent) {
         if (tagName === "textarea") {
             await page.keyboard.press("Enter");
@@ -468,7 +383,6 @@ async function extractResponse() {
             const messages = document.querySelectorAll('[class*="message"], [class*="chat-msg"], [class*="assistant"], [class*="bot"], [class*="response"]');
             if (messages.length === 0) return "";
 
-            // Get the last message that looks like an AI response
             const lastMsg = messages[messages.length - 1];
             const textEl = lastMsg.querySelector("p, span, div") || lastMsg;
             return textEl.textContent?.trim() || "";
@@ -481,7 +395,6 @@ async function extractResponse() {
             stableCount++;
         }
 
-        // Stable for 2 seconds → done
         if (stableCount >= 2 && text.length > 0) {
             return text;
         }
@@ -495,10 +408,6 @@ async function extractResponse() {
 
 // ─── Public API ────────────────────────────────────────────────────────
 
-/**
- * Ask GPT-5.5 on EaseMate.ai a question.
- * Manages browser lifecycle and session cookies automatically.
- */
 export async function askEaseMate(prompt) {
     await initBrowser();
 
@@ -509,7 +418,6 @@ export async function askEaseMate(prompt) {
         await navigateToChat();
         await page.waitForTimeout(3000);
 
-        // Check if still logged in
         const loggedIn = await isLoggedIn();
         if (!loggedIn) {
             log.info("[EaseMate] Session expired, re-signing up...");
@@ -520,7 +428,6 @@ export async function askEaseMate(prompt) {
         }
     }
 
-    // Clear any existing conversation / input
     try {
         const clearBtns = await page.$$("button:has-text('New Chat'), button:has-text('Clear'), button:has-text('Reset')");
         if (clearBtns.length > 0) {
@@ -537,9 +444,6 @@ export async function askEaseMate(prompt) {
     return response;
 }
 
-/**
- * Close browser — call on bot shutdown.
- */
 export async function easemateClose() {
     if (browser) {
         saveCookies();

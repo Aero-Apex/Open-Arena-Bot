@@ -88,11 +88,6 @@ const CONFIG = {
         apiKey: process.env.ANTICAPTCHA_API_KEY,
         capsolverKey: process.env.CAPSOLVER_API_KEY,
     },
-
-    easemate: {
-        url: "https://www.easemate.ai/webapp/chat?from=ai-chat",
-        sessionDir: process.env.EASEMATE_SESSION_DIR || "./sessions",
-    },
 };
 
 export default CONFIG;

@@ -28,7 +28,6 @@ import {
     stopAllStatusIntervals
 } from './handlers/stateManager.js';
 import { askLLM, searchSearXNG } from './services/nvidiaService.js';
-import { easemateClose } from './services/easemateService.js';
 import { splitIntoChunks, keepTyping } from './utils/helpers.js';
 
 const commandHandlers = {
@@ -201,7 +200,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 async function shutdown(signal) {
     log.info(`Shutting down (${signal})...`);
     stopAllStatusIntervals();
-    await easemateClose();
     client.destroy();
     process.exit(0);
 }

@@ -7,7 +7,7 @@ import {
 
 import { automateDavinci } from '../services/davinciService.js';
 import { askLLM, searchSearXNG } from '../services/nvidiaService.js';
-import { askEaseMate, getAccountEmail } from '../services/easemateService.js';
+
 import { clearHistory, startStatusInterval } from './stateManager.js';
 import { buildProgressEmbed, buildResultEmbed, buildErrorEmbed } from '../utils/stepEmbed.js';
 
@@ -98,59 +98,11 @@ const nvidiaSteps = [
     "📝 Formatting response",
 ];
 
-const easemateSteps = [
-    "📧 Creating email account",
-    "🌐 Navigating to EaseMate",
-    "🔑 Signing up",
-    "🤖 Selecting GPT-5.5",
-    "💬 Sending prompt",
-    "📥 Waiting for response",
-];
-
 export async function handleAsk(interaction) {
     await interaction.deferReply();
     const prompt = interaction.options.getString('prompt');
-    const model = interaction.options.getString('model') || 'nvidia';
     const webSearch = interaction.options.getBoolean('web_search') || false;
 
-    if (model === 'easemate') {
-        const desc = `📝 **Prompt:**\n${prompt.slice(0, 500)}`;
-        await updateEmbed(interaction, '🤖 EaseMate GPT-5.5', desc, easemateSteps, 0, { footer: 'EaseMate.ai' });
-
-        const onProgress = (msg) => {
-            const matchedIdx = easemateSteps.findIndex(s => s.toLowerCase().includes(msg.toLowerCase().split(' ')[0]?.toLowerCase()));
-            const stepIdx = matchedIdx >= 0 ? matchedIdx : Math.min(currentEaseStep + 1, easemateSteps.length - 1);
-            updateEmbed(interaction, '🤖 EaseMate GPT-5.5', desc + `\n\n🔄 ${msg}`, easemateSteps, stepIdx, { footer: 'EaseMate.ai' });
-        };
-
-        let currentEaseStep = 0;
-
-        try {
-            const response = await askEaseMate(prompt, onProgress);
-            currentEaseStep = easemateSteps.length;
-
-            const resultEmbed = buildResultEmbed(
-                '✅ EaseMate GPT-5.5 Response',
-                response.slice(0, 4000),
-                {
-                    fields: [
-                        { name: '📝 Prompt', value: prompt.slice(0, 1024), inline: false },
-                        { name: '🤖 Model', value: 'EaseMate GPT-5.5', inline: true },
-                        { name: '📧 Email', value: getAccountEmail(), inline: true },
-                    ]
-                }
-            );
-
-            await interaction.editReply({ embeds: [resultEmbed] });
-        } catch (err) {
-            log.error('EaseMate ask error:', err);
-            const errorEmbed = buildErrorEmbed('❌ EaseMate GPT-5.5 Failed', err.message.slice(0, 2000));
-            await interaction.editReply({ embeds: [errorEmbed] });
-        }
-        return;
-    }
-
-    // NVIDIA Nemotron path
     const steps = webSearch ? nvidiaSteps : nvidiaSteps.slice(1);
     const desc = `📝 **Prompt:**\n${prompt.slice(0, 1000)}${webSearch ? '\n\n🌐 **Web search enabled**' : ''}`;
 

@@ -5,6 +5,29 @@ All notable changes to the OpenArena Discord Bot project will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2024-XX-XX
+
+### 🐛 Fixed
+- **Crash on `/generate` and other commands**: Missing `cooldowns` config caused `TypeError: Cannot read properties of undefined (reading 'defaultSeconds')` in `getCooldownSeconds()`. Added cooldown configuration with sensible defaults.
+- **Missing command mappings in cooldown lookup**: Refactored `getCooldownSeconds()` to use an explicit object map covering all commands instead of a sparse switch statement.
+- **18 missing config properties**: The config object was missing entire sections (`nvidia`, `searxng`, `memory`, `colors`, `discordLimits`, `typing`) that all runtime code depended on. Added every missing path with sensible defaults.
+- **Unhandled interaction errors**: Wrapped the `InteractionCreate` handler in a global try/catch with user-friendly error replies and logging, preventing crashes from bubbling up to the `unhandledRejection` handler.
+- **Hardcoded color values**: Replaced inline `0xFF0000` error colors with centralized `CONFIG.colors.*` references.
+- **`.gitignore` broken format**: Removed stray triple-backtick delimiter that invalidated the file.
+- **Missing CLIENT_ID check**: Added a warning when `CLIENT_ID` is not set, skipping command registration instead of crashing.
+
+### 🚀 Upgrades
+- **Config overhaul**: Restructured `src/config/index.js` into clean namespaces matching runtime expectations (`nvidia.*`, `searxng.*`, `memory.*`, `colors.*`, `discordLimits.*`, `typing.*`). Added `NVIDIA_BASE_URL` and `NVIDIA_MODEL` env var overrides.
+- **Global error handling**: Added `process.on("unhandledRejection")` and `process.on("SIGTERM")` handlers alongside the existing `SIGINT` handler.
+- **Optional dependencies cleaned**: Removed unused Discord.js imports from `src/index.js` (`PermissionFlagsBits`, `EmbedBuilder`, `ActionRowBuilder`, `ButtonBuilder`, `ButtonStyle`).
+- **`.env.example` updated**: Added documentation for all new environment variables with clear required/optional indicators.
+- **`LICENSE.md`**: Added MIT license file.
+
+### 📚 Documentation
+- **README.md redesigned**: Added shields/badges, feature table, architecture diagram (ASCII), configuration reference, and better-organized sections.
+
+---
+
 ## [2.0.0] - 2024-XX-XX
 
 ### 🚀 Major Architectural Overhaul

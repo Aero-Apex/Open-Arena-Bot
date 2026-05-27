@@ -1,32 +1,27 @@
-import { 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    AttachmentBuilder 
+import {
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    AttachmentBuilder
 } from 'discord.js';
 
-// Services & Utils
 import { automateDavinci } from '../services/davinciService.js';
 import { askLLM, searchSearXNG } from '../services/nvidiaService.js';
 import { clearHistory, startStatusInterval } from './stateManager.js';
 
-// Config & Logger (Using Default Exports)
 import CONFIG from '../config/index.js';
 import log from '../utils/logger.js';
 
-/**
- * Handle /generate command
- */
 export async function handleGenerate(interaction) {
     await interaction.deferReply();
 
     const prompt = interaction.options.getString('prompt');
     const aspect = interaction.options.getString('aspect') || '1:1';
-    const model = interaction.options.getString('model') || 'GPT Image 2'; 
+    const model = interaction.options.getString('model') || 'GPT Image 2';
 
     const loadingEmbed = new EmbedBuilder()
-        .setColor(CONFIG.embed.DEFAULT_COLOR)
+        .setColor(CONFIG.colors.primary)
         .setTitle('🎨 Generating Image...')
         .setDescription(`**Prompt:** ${prompt}\n**Model:** ${model}\n**Aspect:** ${aspect}\n\n⏳ This may take up to 60 seconds due to browser automation...`)
         .setFooter({ text: 'Powered by Davinci.ai' });
@@ -42,7 +37,7 @@ export async function handleGenerate(interaction) {
         const attachment = new AttachmentBuilder(imgBuffer, { name: fileName });
 
         const successEmbed = new EmbedBuilder()
-            .setColor(CONFIG.embed.DEFAULT_COLOR)
+            .setColor(CONFIG.colors.success)
             .setTitle('✨ Image Generated Successfully!')
             .setImage(`attachment://${fileName}`)
             .addFields(
@@ -69,7 +64,7 @@ export async function handleGenerate(interaction) {
     } catch (err) {
         log.error('Generate command error:', err);
         const errorEmbed = new EmbedBuilder()
-            .setColor(0xFF0000)
+            .setColor(CONFIG.colors.error)
             .setTitle('❌ Generation Failed')
             .setDescription(`Could not generate image: ${err.message}\n\n*Note: Davinci.ai may have updated their UI or enforced Cloudflare CAPTCHAs.*`)
             .setTimestamp();
@@ -77,22 +72,19 @@ export async function handleGenerate(interaction) {
     }
 }
 
-/**
- * Handle /ask command
- */
 export async function handleAsk(interaction) {
     await interaction.deferReply();
     const prompt = interaction.options.getString('prompt');
     const webSearch = interaction.options.getBoolean('web_search') || false;
-    
+
     try {
         let context = "";
         if (webSearch) {
             context = await searchSearXNG(prompt);
         }
-        
-        const userMessage = context 
-            ? `Web Search Results:\n${context}\n\nUser Prompt: ${prompt}` 
+
+        const userMessage = context
+            ? `Web Search Results:\n${context}\n\nUser Prompt: ${prompt}`
             : prompt;
 
         const messages = [
@@ -101,9 +93,9 @@ export async function handleAsk(interaction) {
         ];
 
         const { reasoning, content } = await askLLM(messages, null, { enableThinking: true });
-        
-        const finalReply = (reasoning 
-            ? `||🤔 **Thinking:** ${reasoning.trim().slice(0, 800)}||\n` 
+
+        const finalReply = (reasoning
+            ? `||🤔 **Thinking:** ${reasoning.trim().slice(0, 800)}||\n`
             : "") + content;
 
         await interaction.editReply(finalReply.slice(0, 2000));
@@ -113,9 +105,6 @@ export async function handleAsk(interaction) {
     }
 }
 
-/**
- * Handle /rate command
- */
 export async function handleRate(interaction) {
     await interaction.deferReply();
     const model = interaction.options.getString('model');
@@ -126,9 +115,9 @@ export async function handleRate(interaction) {
             { role: "user", content: `Analyze the following web search results about the AI model "${model}" and provide the JSON rating:\n\n${searchResults}` }
         ];
 
-        const { content } = await askLLM(messages, null, { 
-            temperature: CONFIG.rate.temperature, 
-            maxTokens: CONFIG.rate.maxTokens 
+        const { content } = await askLLM(messages, null, {
+            temperature: CONFIG.rate.temperature,
+            maxTokens: CONFIG.rate.maxTokens
         });
 
         await interaction.editReply(`**Model Rating for ${model}:**\n${content}`);
@@ -138,9 +127,6 @@ export async function handleRate(interaction) {
     }
 }
 
-/**
- * Handle /battle command
- */
 export async function handleBattle(interaction) {
     await interaction.deferReply();
     const modelA = interaction.options.getString('model_a');
@@ -152,9 +138,9 @@ export async function handleBattle(interaction) {
             { role: "user", content: `Analyze the following web search results comparing "${modelA}" (Model A) and "${modelB}" (Model B) and provide the JSON matchup summary:\n\n${searchResults}` }
         ];
 
-        const { content } = await askLLM(messages, null, { 
-            temperature: CONFIG.battle.temperature, 
-            maxTokens: CONFIG.battle.maxTokens 
+        const { content } = await askLLM(messages, null, {
+            temperature: CONFIG.battle.temperature,
+            maxTokens: CONFIG.battle.maxTokens
         });
 
         await interaction.editReply(`**⚔️ Arena Battle: ${modelA} vs ${modelB}**\n${content}`);
@@ -164,9 +150,6 @@ export async function handleBattle(interaction) {
     }
 }
 
-/**
- * Handle /clear command
- */
 export async function handleClear(interaction) {
     try {
         clearHistory(interaction.channelId);
@@ -177,27 +160,18 @@ export async function handleClear(interaction) {
     }
 }
 
-/**
- * Handle /ping command
- */
 export async function handlePing(interaction) {
     const sent = await interaction.reply({ content: 'Pinging...', fetchReply: true });
     const latency = sent.createdTimestamp - interaction.createdTimestamp;
     await interaction.editReply(`🏓 Pong! Roundtrip latency: ${latency}ms | API Latency: ${Math.round(interaction.client.ws.ping)}ms`);
 }
 
-/**
- * Handle /status command
- */
 export async function handleStatus(interaction) {
     await interaction.deferReply();
     startStatusInterval(interaction.client, interaction.channel);
     await interaction.editReply('📊 Status monitor initialized. Pinging endpoints...');
 }
 
-/**
- * Handle /message command (Admin)
- */
 export async function handleMessage(interaction) {
     await interaction.reply({ content: '✅ Webhook embed sent.', ephemeral: true });
 }

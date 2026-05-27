@@ -1,6 +1,6 @@
 {
   "name": "open-arena-bot",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "The Ultimate Multi-AI Discord Mega-Bot with NVIDIA Nemotron, SearXNG, and Davinci.ai integration",
   "main": "src/index.js",
   "type": "module",

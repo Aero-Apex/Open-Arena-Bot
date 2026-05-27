@@ -464,8 +464,26 @@ async function selectGpt55() {
         await modelTrigger.click();
         await page.waitForTimeout(1500);
 
-        const gpt55 = await page.waitForSelector("span:has-text('GPT-5.5')", { timeout: 5000 });
-        await gpt55.click();
+        let gpt55 = await page.$("span:text-is('GPT-5.5')");
+        if (!gpt55) {
+            const all = await page.$$("span:has-text('GPT-5.5')");
+            for (const el of all) {
+                const text = await el.textContent();
+                if (text?.trim() === "GPT-5.5") { gpt55 = el; break; }
+            }
+        }
+        if (!gpt55) {
+            const all = await page.$$("div:has-text('GPT-5.5'), li:has-text('GPT-5.5')");
+            for (const el of all) {
+                const text = await el.textContent();
+                if (text?.trim() === "GPT-5.5") { gpt55 = el; break; }
+            }
+        }
+        if (!gpt55) throw new Error("GPT-5.5 option not found");
+
+        try { await gpt55.click({ timeout: 3000 }); }
+        catch { await gpt55.evaluate(el => el.parentElement?.click() || el.click()); }
+
         await page.waitForTimeout(1500);
         log.info("[EaseMate] Model set to GPT-5.5");
     } catch (e) {
@@ -528,7 +546,7 @@ async function sendPrompt(text) {
     let sent = false;
     for (const sel of sendBtns) {
         const btn = await page.$(sel);
-        if (btn) { await btn.click(); sent = true; break; }
+        if (btn) { try { await btn.click({ force: true, timeout: 3000 }); sent = true; break; } catch {} }
     }
 
     if (!sent) {
@@ -545,17 +563,33 @@ async function extractResponse() {
 
     while (Date.now() - start < maxWait) {
         const text = await page.evaluate(() => {
-            const els = document.querySelectorAll(
-                '[class*="message"]:not([class*="user"]):not([class*="you"]), ' +
-                '[class*="assistant"], [class*="bot"], [class*="response"], ' +
-                '[class*="chat-msg"]:nth-child(odd)'
-            );
-            if (!els.length) return "";
-            const lastEl = els[els.length - 1];
-            const t = lastEl.textContent?.trim() || "";
-            // Skip if it only contains loading/typing indicators
-            if (t.length < 3 || t.includes("Typing") || t.includes("typing")) return "";
-            return t;
+            const patterns = [
+                '[class*="message"]:not([class*="user"]):not([class*="you"]):not([class*="User"])',
+                '[class*="assistant"]', '[class*="Assistant"]',
+                '[class*="bot"]', '[class*="Bot"]',
+                '[class*="response"]', '[class*="Response"]',
+                '[class*="chat-msg"]', '[class*="chat-message"]',
+                '[class*="message-content"]', '[class*="msg-content"]',
+                '[class*="ai-message"]', '[class*="answer"]',
+                '[class*="markdown"]', '[class*="Markdown"]',
+                '[class*="text-content"]', '[class*="content-text"]',
+                '[class*="content"] p', '[class*="content"] div:not([class*="input"]):not([class*="user"])',
+            ];
+
+            for (const sel of patterns) {
+                const els = document.querySelectorAll(sel);
+                if (els.length === 0) continue;
+                const lastEl = els[els.length - 1];
+                const t = lastEl.textContent?.trim() || "";
+                if (t.length >= 10 && !t.includes("Typing") && !t.includes("typing")) {
+                    return t;
+                }
+            }
+
+            const all = document.body?.innerText || "";
+            const lines = all.split("\n").map(l => l.trim()).filter(l => l.length > 30);
+            if (lines.length > 0) return lines[lines.length - 1];
+            return "";
         });
 
         if (text && text !== last) {

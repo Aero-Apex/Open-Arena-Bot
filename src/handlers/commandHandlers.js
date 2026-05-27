@@ -8,7 +8,7 @@ import {
 
 import { automateDavinci } from '../services/davinciService.js';
 import { askLLM, searchSearXNG } from '../services/nvidiaService.js';
-import { askEaseMate } from '../services/easemateService.js';
+import { askEaseMate, getAccountEmail } from '../services/easemateService.js';
 import { clearHistory, startStatusInterval } from './stateManager.js';
 
 import CONFIG from '../config/index.js';
@@ -80,12 +80,47 @@ export async function handleAsk(interaction) {
     const webSearch = interaction.options.getBoolean('web_search') || false;
 
     if (model === 'easemate') {
+        const statusEmbed = new EmbedBuilder()
+            .setColor(CONFIG.colors.primary)
+            .setTitle('🤖 EaseMate GPT-5.5')
+            .setDescription(`📝 **Prompt:**\n${prompt.slice(0, 500)}\n\n🔄 Starting...`)
+            .setFooter({ text: 'EaseMate.ai' })
+            .setTimestamp();
+
+        await interaction.editReply({ embeds: [statusEmbed] });
+
+        const onProgress = (msg) => {
+            statusEmbed.setDescription(
+                `📝 **Prompt:**\n${prompt.slice(0, 500)}\n\n🔄 ${msg}`
+            );
+            interaction.editReply({ embeds: [statusEmbed] }).catch(() => {});
+        };
+
         try {
-            const response = await askEaseMate(prompt);
-            await interaction.editReply(response.slice(0, 2000));
+            const response = await askEaseMate(prompt, onProgress);
+
+            const resultEmbed = new EmbedBuilder()
+                .setColor(CONFIG.colors.success)
+                .setTitle('✅ EaseMate GPT-5.5 Response')
+                .setDescription(response.slice(0, 4000))
+                .addFields(
+                    { name: '📝 Prompt', value: prompt.slice(0, 1024), inline: false },
+                    { name: '🤖 Model', value: 'EaseMate GPT-5.5', inline: true },
+                    { name: '📧 Email', value: getAccountEmail(), inline: true }
+                )
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [resultEmbed] });
         } catch (err) {
             log.error('EaseMate ask error:', err);
-            await interaction.editReply(`❌ EaseMate GPT-5.5 failed: ${err.message}`);
+
+            const errorEmbed = new EmbedBuilder()
+                .setColor(CONFIG.colors.error)
+                .setTitle('❌ EaseMate GPT-5.5 Failed')
+                .setDescription(err.message.slice(0, 2000))
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [errorEmbed] });
         }
         return;
     }

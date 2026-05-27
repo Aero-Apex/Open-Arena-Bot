@@ -238,6 +238,32 @@ async function isLoggedIn() {
     }).catch(() => false);
 }
 
+async function dismissModals() {
+    try {
+        await page.keyboard.press("Escape");
+        await page.waitForTimeout(800);
+
+        const closeBtns = await page.$$(
+            "[class*='ant-modal-close'], [aria-label='Close'], " +
+            "button:has-text('Close'), button:has-text('Skip'), " +
+            "button:has-text('Got it'), button:has-text('OK'), " +
+            "button:has-text('Maybe later')"
+        );
+        for (const btn of closeBtns) {
+            try {
+                const box = await btn.boundingBox();
+                if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                await page.waitForTimeout(500);
+            } catch {}
+        }
+
+        const masks = await page.$$("[class*='ant-modal-mask'], [class*='ant-modal-wrap']");
+        for (const mask of masks) {
+            try { await mask.click({ timeout: 2000, position: { x: 1, y: 1 }, force: true }); await page.waitForTimeout(500); } catch {}
+        }
+    } catch {}
+}
+
 // ─── Signup flow ────────────────────────────────────────────────────────
 
 async function signup() {
@@ -351,6 +377,7 @@ async function signup() {
         await page.waitForTimeout(3000);
     }
 
+    await dismissModals();
     await selectGpt55();
     saveCookies();
     updateProgress("Account ready!");
@@ -506,10 +533,12 @@ export async function askEaseMate(prompt, onProgress) {
             await destroySession();
             await signup();
         } else {
+            await dismissModals();
             await selectGpt55();
         }
     }
 
+    await dismissModals();
     updateProgress("Sending prompt to GPT-5.5...");
     await sendPrompt(prompt);
 

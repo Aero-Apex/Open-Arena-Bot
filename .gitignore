@@ -33,6 +33,9 @@ playwright-core/
 # Sessions (cookies, etc)
 sessions/
 
+# Debug screenshots
+*.png
+
 # IDE
 .vscode/
 .idea/

@@ -8,6 +8,8 @@ import log from "../utils/logger.js";
 
 const MAILTM_BASE = "https://api.mail.tm";
 const SESSION_PATH = path.resolve(CONFIG.easemate.sessionDir, "easemate_cookies.json");
+const USAGE_PATH = path.resolve(CONFIG.easemate.sessionDir, "easemate_usage.json");
+const MAX_USES = 2;
 
 function generatePassword(length = 6) {
     return crypto.randomBytes(length).toString("hex").slice(0, length);
@@ -172,6 +174,13 @@ function saveCookies() {
 async function loadCookies(ctx) {
     if (!fs.existsSync(SESSION_PATH)) return false;
     try {
+        const usage = loadUsageCount();
+        if (usage >= MAX_USES) {
+            log.info(`[EaseMate] Session used ${usage}/${MAX_USES} times, expiring...`);
+            await destroySession();
+            return false;
+        }
+
         const cookies = JSON.parse(fs.readFileSync(SESSION_PATH, "utf-8"));
         if (!Array.isArray(cookies) || cookies.length === 0) return false;
         await ctx.addCookies(cookies);
@@ -184,7 +193,35 @@ async function loadCookies(ctx) {
 
 async function destroySession() {
     if (fs.existsSync(SESSION_PATH)) fs.unlinkSync(SESSION_PATH);
+    if (fs.existsSync(USAGE_PATH)) fs.unlinkSync(USAGE_PATH);
     _account = null;
+}
+
+function loadUsageCount() {
+    try {
+        if (fs.existsSync(USAGE_PATH)) {
+            const data = JSON.parse(fs.readFileSync(USAGE_PATH, "utf-8"));
+            return data.count || 0;
+        }
+    } catch {}
+    return 0;
+}
+
+function incrementUsageCount() {
+    try {
+        ensureSessionDir();
+        const count = loadUsageCount() + 1;
+        fs.writeFileSync(USAGE_PATH, JSON.stringify({ count }, null, 2), "utf-8");
+        log.info(`[EaseMate] Session use ${count}/${MAX_USES}`);
+        return count;
+    } catch {}
+    return 0;
+}
+
+function resetUsageCount() {
+    try {
+        if (fs.existsSync(USAGE_PATH)) fs.unlinkSync(USAGE_PATH);
+    } catch {}
 }
 
 function updateProgress(msg) {
@@ -240,28 +277,52 @@ async function isLoggedIn() {
 
 async function dismissModals() {
     try {
-        await page.keyboard.press("Escape");
-        await page.waitForTimeout(800);
-
-        const closeBtns = await page.$$(
-            "[class*='ant-modal-close'], [aria-label='Close'], " +
-            "button:has-text('Close'), button:has-text('Skip'), " +
-            "button:has-text('Got it'), button:has-text('OK'), " +
-            "button:has-text('Maybe later')"
-        );
-        for (const btn of closeBtns) {
-            try {
-                const box = await btn.boundingBox();
-                if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-                await page.waitForTimeout(500);
-            } catch {}
+        for (let i = 0; i < 5; i++) {
+            await page.keyboard.press("Escape");
+            await page.waitForTimeout(300);
         }
 
-        const masks = await page.$$("[class*='ant-modal-mask'], [class*='ant-modal-wrap']");
-        for (const mask of masks) {
-            try { await mask.click({ timeout: 2000, position: { x: 1, y: 1 }, force: true }); await page.waitForTimeout(500); } catch {}
+        const closeSelectors = [
+            "[class*='ant-modal-close']",
+            "[class*='modal-close']",
+            "[class*='close-btn']",
+            "[aria-label='Close']",
+            "button:has-text('Close')",
+            "button:has-text('Skip')",
+            "button:has-text('Got it')",
+            "button:has-text('OK')",
+            "button:has-text('Maybe later')",
+            "button:has-text('Start')",
+            "button:has-text('Continue')",
+            "button:has-text('Get started')",
+        ];
+        for (const sel of closeSelectors) {
+            const btns = await page.$$(sel);
+            for (const btn of btns) {
+                try { await btn.click({ force: true, timeout: 2000 }); await page.waitForTimeout(400); } catch {}
+            }
         }
-    } catch {}
+
+        await page.evaluate(() => {
+            document.querySelectorAll(
+                "[class*='ant-modal-wrap'], [class*='ant-modal-mask']"
+            ).forEach(el => el.remove());
+
+            document.querySelectorAll("div").forEach(el => {
+                const z = parseInt(window.getComputedStyle(el).zIndex);
+                const pos = window.getComputedStyle(el).position;
+                if ((pos === 'fixed' || pos === 'absolute') && (z >= 1000 || el.getAttribute('role') === 'dialog')) {
+                    if (!el.closest('textarea') && !el.closest('input') && !el.closest('[contenteditable]')) {
+                        el.style.display = 'none';
+                    }
+                }
+            });
+        });
+
+        await page.waitForTimeout(1000);
+    } catch (e) {
+        log.warn("[EaseMate] dismissModals error:", e.message);
+    }
 }
 
 // ─── Signup flow ────────────────────────────────────────────────────────
@@ -521,6 +582,7 @@ export async function askEaseMate(prompt, onProgress) {
 
     const hasCookies = await loadCookies(context);
     if (!hasCookies) {
+        resetUsageCount();
         await signup();
     } else {
         updateProgress("Loading session...");
@@ -546,6 +608,7 @@ export async function askEaseMate(prompt, onProgress) {
     const response = await extractResponse();
 
     saveCookies();
+    incrementUsageCount();
     _onProgress = null;
 
     return response;
